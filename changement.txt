@@ -1,0 +1,28 @@
+lancement 
+	InitialisationOpenGL
+	loading
+effet
+	Draw_Systeme_de_Particule
+Bonus
+	DrawBonus
+Boucledejeu
+	dans winmain
+		//affichage
+     {Vidage du contenu situé à l'écran}
+     glClear(GL_COLOR_BUFFER_BIT Or GL_DEPTH_BUFFER_BIT);
+     glClearColor(0.7, 0.7, 0.7, 1.0);
+Armes
+	T_Arme_6.Affiche
+
+modification dans typeges : T_param
+modification danns lancement on appelle builfont avec police en paramètre
+modification de l'appel de la fonction glCreateWindows
+modification dansBoucle de jeu winmain
+modification dans T_joueur.affiche
+modification dans T_Joueur.colliAV
+
+modification dans T_arme_2.init
+		  T_arme_4.init
+		  T_arme_5.init
+		  T_arme_6.init
+		  T_arme_6.actualise

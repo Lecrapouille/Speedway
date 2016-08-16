@@ -1,0 +1,789 @@
+unit QQ;
+
+interface
+
+USES
+  Windows,
+  SysUtils,
+  Messages,
+  Opengl,
+  typege,
+  Joueur,
+  Voiture,
+  collision,
+  UControle,
+  Armes,
+  U_Chargement,
+  lancement,
+  math,
+  maths,
+  effet,
+  Bonus,
+  Repere,
+  DDirectSound,
+  caractere;
+
+function DistanceVoiture(VoitA,VoitB : T_pJoueur) : real;
+
+function PlusPresVoit(voitA, ll : T_pJoueur) : T_pJoueur;
+procedure PeurDrapeau(liste : T_pJoueur; Dx, Dz : integer);
+procedure TrouveDrapeau(liste : T_pJoueur; Dx,Dz : integer; PlusDrapeauBleu,PlusDrapeauRouge : integer);
+procedure TrouveDrapeau2(liste : T_pJoueur; Dx, Dz : integer);
+procedure OPSFlinge(VoitA,VoitB : T_pJoueur; FrequenceTir : integer);
+procedure TrouveBonus(bot : T_pJoueur; bbonus : T_pBonus; coef : real);
+procedure ChampAttractif(VoitA,VoitB : T_pJoueur; CoefTuerie : real);
+procedure ChampRepulsif (VoitA,VoitB : T_pJoueur; CoefPeur : real);
+procedure InitArm(liste : T_pJoueur);
+procedure EviteVoiture(bot, liste : t_pJoueur; coef : integer);
+function ChoisitLeader(ll : T_pJoueur) : T_pJoueur;
+procedure EviteMine(bot : T_pJoueur; var aarme : T_pArme);
+Procedure SuivreLeader(voitA,liste : T_pJoueur);
+procedure LeaderVsleader(VoitA, liste : t_pJoueur);
+procedure ChampVM(j1 : T_pJoueur; map : PObjet; coeft : real);
+procedure gueulle(var dsb : array of  TDirectSoundBuffer; ll : t_pJoueur);
+procedure AmbianceTirs(var dsb : array of  TDirectSoundBuffer);
+procedure Radar(liste : t_pJoueur; obj : PObjet; EspaceX,EspaceY,EchelleX,EchelleY : integer);
+procedure TrouveUnMort(voitA, liste : T_pJoueur);
+procedure EviteVoiture2(bot, liste : t_pJoueur; coef : integer);
+procedure AmbianceSonore(var dsb : array of  TDirectSoundBuffer; liste : t_pJoueur; NbCarte : integer);
+procedure AutreJoueur(pjoueur,liste : T_pJoueur);
+
+implementation
+
+//CONST
+//MYTIME = 1;
+//FROT = 0.8;
+
+var
+    ClignoteRouge : integer = 0;
+    ClignoteBleu : integer = 0;
+    NbGainBleu : integer = 0;
+    NbGainRouge : integer = 0;
+    FreqTir : integer = 7; // frequence des tirs des voitures ennemies
+    MyTime : real = 1;
+    Frot : real = 0.8;
+
+//-----------------------------------------------------------------------------//
+function DistanceVoiture(VoitA,VoitB : T_pJoueur) : real;
+begin
+  result := sqrt(sqr(VoitA.Voiture.emplacement.coordx - VoitB.Voiture.emplacement.coordx)
+       + sqr(VoitA.Voiture.emplacement.coordz - VoitB.Voiture.emplacement.coordz));
+end;
+
+//-----------------------------------------------------------------------------//
+procedure AmbianceSonore(var dsb : array of  TDirectSoundBuffer; liste : t_pJoueur; NbCarte : integer);
+var ram : integer;
+begin
+ gueulle(dsb,liste); //sons aleatoires pour ambience
+ //AmbianceTirs(dsb);
+
+      Case NbCarte of
+        0,1 : begin
+              ram := random(100);
+              case ram of
+                0 : dsb[65].play(0);    //cloche et corbeaux
+                1 : dsb[66].play(0);
+              end;
+            end;
+        2 : begin
+              ram := random(100);
+              case ram of
+                0 : dsb[65].play(0);    //cloche et corbeaux
+                1 : dsb[66].play(0);
+                2 : dsb[64].play(0);
+                3 : dsb[67].play(0);
+              end;
+            end;
+        3 : {RIEN};
+        4 : begin
+              ram := random(100);
+              case ram of
+                0 : dsb[69].play(0);    //cloche et corbeaux
+                1 : dsb[72].play(0);
+              end;
+            end;
+        5 : begin
+              ram := random(100);
+              case ram of
+                0 : dsb[66].play(0);    //cloche et corbeaux
+              end;
+            end;
+      end;
+end;
+
+//-----------------------------------------------------------------------------//
+procedure gueulle(var dsb : array of  TDirectSoundBuffer; ll : t_pJoueur {NumCarte : integer});
+var ran,rann : integer; courant : t_pJoueur; nb_amis, nb_ennemis : integer;
+begin
+  courant := ll;
+  nb_amis := 0;
+  nb_ennemis := 0;
+
+  ran  := -1;
+
+  while courant <> NIL do
+  begin
+    if courant.Equipe=bleu then inc(nb_amis)
+    else if courant.Equipe=rouge then inc(nb_ennemis);
+    courant := courant^.next;
+  end;
+
+  if (nb_ennemis = 1) AND (nb_amis > 1) then dsb[45].play(0);
+
+  case nb_amis of
+    1 : if nb_ennemis > 1 then
+        begin
+          rann := random(150);
+          case rann of
+            0 : dsb[50].play(0);     // insultes ennemis
+            1 : dsb[43].play(0);
+            2 : dsb[44].play(0);
+          end;
+        end;
+    2 : ran := random(1000);
+    3 : ran := random(1000);
+    4 : ran := random(800);
+    5 : ran := random(800);
+    6 : ran := random(400);
+    7 : ran := random(400);
+  end;
+
+  //messages insultes aleatoires  du camp ami
+  case ran of
+    0 : dsb[12].play(0);
+    1 : dsb[15].play(0);
+    2 : dsb[16].play(0);
+    3 : dsb[17].play(0);
+    4 : dsb[18].play(0);
+    5 : dsb[19].play(0);
+    6 : dsb[20].play(0);
+    7 : dsb[21].play(0);
+    8 : dsb[22].play(0);
+    9 : dsb[23].play(0);
+    10 : dsb[24].play(0);
+    11 : dsb[25].play(0);
+  end;  
+end;
+
+//-----------------------------------------------------------------------------//
+procedure AmbianceTirs(var dsb : array of  TDirectSoundBuffer);
+var ran : integer;
+begin
+  ran := random(100);  //sons detirs aleatoires
+  case ran of
+    0 : dsb[6].play(0);
+    1 : dsb[7].play(0);
+    2 : dsb[13].play(0);
+    3 : dsb[33].play(0);
+    4 : dsb[34].play(0);
+    5 : dsb[35].play(0);
+    6 : dsb[36].play(0);
+    7 : dsb[37].play(0);
+    8 : dsb[38].play(0);
+    9 : dsb[39].play(0);
+    10 : dsb[40].play(0);
+    11 : dsb[41].play(0);
+  end;
+end;
+//-----------------------------------------------------------------------------//
+
+procedure InitArm(liste : T_pJoueur);
+var ll : t_pJoueur; ran : integer;
+begin
+  ll := liste;
+  while (ll <> NIL) AND (ll.Categorie <> humain) do
+  begin
+    ran := random(6)+1;
+    case ran of
+      1 : ll.Armeselectionne.Id := 6;
+      2 : ll.Armeselectionne.Id := 2 ;
+      3 : ll.Armeselectionne.Id := 4 ;
+      4 : ll.Armeselectionne.Id := 2 ;
+      5 : ll.Armeselectionne.Id := 5 ;
+      6 : ll.Armeselectionne.Id := 6 ;
+    end;
+    ll := ll.next;
+  end;
+end;
+
+//-----------------------------------------------------------------------------//
+procedure OPSFlinge(VoitA,VoitB : T_pJoueur; FrequenceTir : integer);
+
+var Dx,Dy,Scal : glfloat; temp : integer;
+begin
+  if (VoitA.Equipe <> VoitB.Equipe) AND (not(VoitA.mort)) AND (not(VoitB.mort)) then
+  begin
+      Dx := VoitB.Voiture.emplacement.coordx - VoitA.Voiture.emplacement.coordx;
+      Dy := VoitB.Voiture.emplacement.coordz - VoitA.Voiture.emplacement.coordz;
+
+      scal := (Dx*VoitA.Voiture.Vex+Dy*VoitA.Voiture.Vey)/(sqrt((sqr(VoitA.Voiture.Vex)+sqr(VoitA.Voiture.Vey))*(sqr(Dx)+sqr(Dy))));
+
+      if (Scal >= 0.97) then
+      begin
+
+      if VoitA.Armeselectionne.Id = 1 then VoitA.Armeselectionne.Id := 2;
+
+             VoitA.Voiture.NbTirs := ((VoitA.Voiture.NbTirs+1) mod FrequenceTir);
+             if VoitA.Voiture.NbTirs = 0 then
+               begin
+                 if VoitA.arme_3.NbrArme <> 0 then
+                 begin
+                   Temp := VoitA.Armeselectionne.Id;
+                   VoitA.Armeselectionne.Id := 3;
+                   VoitA.Tire;
+                   VoitA.Armeselectionne.Id := Temp;
+                 end;
+                 VoitA.Tire;
+               end;
+        end;
+      end;
+end;
+//-----------------------------------------------------------------------------//
+
+procedure ChampAttractif(VoitA,VoitB : T_pJoueur; CoefTuerie : real);
+var distance,Ax,Ay,Vxx,Vyy : real;
+begin
+// ATTENTION COORDZ est = a l'axe (Oy) !!!!!!
+// Bool : booleen pour savoir si le coef prend en compte la distance entre les 2 voitures
+
+      //CoefTuerie := Coef;
+
+      Ax := (CoefTuerie*(Voitb.Voiture.emplacement.coordx - Voita.Voiture.emplacement.coordx));
+      Ay := (CoefTuerie*(Voitb.Voiture.emplacement.coordz - Voita.Voiture.emplacement.coordz));
+
+      Vxx := VoitA.Voiture.Vex + MYTIME*Ax;
+      Vyy := VoitA.Voiture.Vey + MYTIME*Ay;
+
+      VoitA.Voiture.Vex := Min(Max(Vxx,-VoitA.Voiture.vitessemax),VoitA.Voiture.vitessemax);
+      VoitA.Voiture.Vey := Min(Max(Vyy,-VoitA.Voiture.vitessemax),VoitA.Voiture.vitessemax);
+end;
+//-----------------------------------------------------------------------------//
+
+procedure ChampRepulsif(VoitA,VoitB : T_pJoueur; CoefPeur : real);
+var Ax,Ay,Vxx,Vyy,Dist : real;
+begin
+//CoefPeur := -30/(Dist*Dist);
+    Dist := DistanceVoiture(VoitA,VoitB);
+    CoefPeur := CoefPeur/(Dist*Dist);
+
+    Ax := CoefPeur*(Voitb.Voiture.emplacement.coordx - Voita.Voiture.emplacement.coordx);
+    Ay := CoefPeur*(Voitb.Voiture.emplacement.coordz - Voita.Voiture.emplacement.coordz);
+
+    Vxx := VoitA.Voiture.Vex+ MYTIME * Ax;
+    Vyy := VoitA.Voiture.Vey+ MYTIME * Ay;
+
+    VoitA.Voiture.Vex := Min(Max(Vxx,-VoitA.Voiture.vitessemax),VoitA.Voiture.vitessemax);
+    VoitA.Voiture.Vey := Min(Max(Vyy,-VoitA.Voiture.vitessemax),VoitA.Voiture.vitessemax);
+end;
+//-----------------------------------------------------------------------------//
+function ChoisitLeader(ll : T_pJoueur) : T_pJoueur;
+{Rappel des grades
+  0  : bidasses,
+  1  : leader,
+  -1 : rien/mort}
+
+var PremB,PremR : boolean; liste,LeJoueur : T_pJoueur;
+begin
+  PremB := TRUE;
+  PremR := TRUE;
+  liste := ll;
+  LeJoueur := NIL;
+
+  while liste <> NIl do
+  begin
+    if (liste.Categorie = humain) AND (liste.vie > 0) then
+        begin
+          liste.grade := 1;
+          LeJoueur := liste;
+        end else
+    if (liste.Categorie = humain) AND (liste.vie <= 0) then
+        begin
+          liste.grade := -1;
+          LeJoueur := liste;
+        end else
+    //if (liste.Categorie <> humain) AND (liste.vie > 0) then liste.grade := 0;
+    //if (liste.Categorie <> humain) AND (liste.vie <= 0) then liste.grade := -1;
+
+
+    if (liste.Categorie <> humain) AND (liste.Equipe = Rouge) AND (liste.vie > 0) AND (premR) then
+        begin
+            liste.grade := 1;
+            premR := FALSE;
+        end
+    else if (liste.Categorie <> humain) AND (liste.Equipe = Rouge) AND (liste.vie > 0) AND (premR) then
+        begin
+           liste.grade := 0;
+        end;
+    liste := liste.next;
+  end;
+
+
+  liste := ll;
+  while liste <> NIL do
+  begin
+
+      //********** CAMP DES BLEUS ******************************************//
+        //si le joueur est vivant alors toutes les voitures bleues vivantes sont 'bidasses'
+        if (LeJoueur <> NIL) AND (LeJoueur.vie > 0) then
+            begin
+               if (liste.Categorie <> humain) AND (liste.vie > 0) AND (liste.Equipe = Bleu) then liste.grade := 0;
+            end
+        else
+            begin //le joueur est mort, donc la premiere voiture bleue est le leader les autres 'bidasses'
+                if ((LeJoueur.vie <= 0) OR (LeJoueur.Equipe = Rouge)) AND (liste.Categorie <> humain) AND (liste.vie > 0) AND (liste.Equipe = Bleu) AND (premB) then
+                begin
+                  liste.grade := 1;
+                  premB := FALSE;
+                end;
+            end;
+      liste := liste.next;
+  end;//while
+
+
+  result := LeJoueur;
+end;
+
+
+//------------------------------------------------------------------------------//
+Procedure SuivreLeader(voitA,liste : T_pJoueur);
+begin
+if liste <> NIL then
+ begin
+    if (voitA <> liste)
+       AND (Not(VoitA.Mort))
+       AND (liste.Equipe = voitA.Equipe)
+       AND (VoitA.grade = 0)
+       AND (liste.grade = 1)
+      // AND (distanceVoiture(VoitA,liste)<300)
+    then ChampAttractif(VoitA,liste,2/80);
+ end;
+end;
+
+procedure BruitFlamme(var dsb : array of  TDirectSoundBuffer; liste : T_pJoueur);
+var ll : T_pJoueur;
+begin
+  ll := liste;
+  while (ll <> NIL) AND (ll.Categorie = humain) do
+  begin
+    if sqrt(sqr(ll.Voiture.emplacement.coordx + 17) + sqr(ll.Voiture.emplacement.coordz - 245)) <= 100
+    then dsb[9].play(1) else
+       if sqrt(sqr(ll.Voiture.emplacement.coordx -27) + sqr(ll.Voiture.emplacement.coordz + 226)) <= 100
+       then dsb[9].play(1) else
+           if sqrt(sqr(ll.Voiture.emplacement.coordx + 244) + sqr(ll.Voiture.emplacement.coordz - 31)) <= 100
+           then dsb[9].play(1) else
+               if sqrt(sqr(ll.Voiture.emplacement.coordx -237) + sqr(ll.Voiture.emplacement.coordz - 48)) <= 100
+               then dsb[9].play(1) else dsb[9].stop;
+    ll := ll.next; 
+  end;
+end;
+
+procedure EviteMine(bot : T_pJoueur; var aarme : T_pArme);
+var arme : t_pArme; dist,coef,Ax,Ay,Vxx,Vyy : real;
+begin
+  arme := aarme;
+  while (arme <> NIL) do
+  begin
+      if (arme.id = 3) then
+      begin
+         dist := sqrt(sqr(bot.Voiture.emplacement.coordx - arme.emplacement.coordx)
+         + sqr(bot.Voiture.emplacement.coordz - arme.emplacement.coordz));
+
+         Coef := -10/(Dist*Dist);
+
+        Ax := (Coef*(arme.emplacement.coordx - bot.Voiture.emplacement.coordx));
+        Ay := (Coef*(arme.emplacement.coordz - bot.Voiture.emplacement.coordz));
+
+        Vxx := bot.Voiture.Vex + MYTIME*Ax;
+        Vyy := bot.Voiture.Vey + MYTIME*Ay;
+
+        bot.Voiture.Vex := Min(Max(Vxx,-bot.Voiture.vitessemax),bot.Voiture.vitessemax);
+        bot.Voiture.Vey := Min(Max(Vyy,-bot.Voiture.vitessemax),bot.Voiture.vitessemax);
+
+        arme := arme.next;
+      end else arme := arme.next;
+  end;
+end;
+
+procedure EviteVoiture2(bot, liste : t_pJoueur; coef : integer);
+begin
+  //while (liste <> NIL) AND (bot<>liste) do
+  if (liste <> NIL) AND (bot<>liste) then
+  begin
+    ChampRepulsif(bot,liste,Coef);
+    liste := liste.next;
+  end;
+end;
+
+procedure EviteVoiture(bot, liste : t_pJoueur; coef : integer);
+begin
+  while (liste <> NIL) AND (bot<>liste) do
+  begin
+    ChampRepulsif(bot,liste,Coef);
+    liste := liste.next;
+  end;
+end;
+
+procedure TrouveBonus(bot : T_pJoueur; bbonus : T_pBonus; coef : real);
+var bonus : t_pBonus; dist,Ax,Ay,Vxx,Vyy : real;
+begin
+
+  bonus := bbonus;
+  while (bonus <> NIL) do
+  begin
+    dist := sqrt(sqr(bot.Voiture.emplacement.coordx - bonus.emplacement.coordx)
+       + sqr(bot.Voiture.emplacement.coordz - bonus.emplacement.coordz));
+
+      Coef := coef/(Dist*Dist);
+
+      Ax := (Coef*(bonus.emplacement.coordx - bot.Voiture.emplacement.coordx));
+      Ay := (Coef*(bonus.emplacement.coordz - bot.Voiture.emplacement.coordz));
+
+      Vxx := bot.Voiture.Vex + MYTIME*Ax;
+      Vyy := bot.Voiture.Vey + MYTIME*Ay;
+
+      bot.Voiture.Vex := Min(Max(Vxx,-bot.Voiture.vitessemax),bot.Voiture.vitessemax);
+      bot.Voiture.Vey := Min(Max(Vyy,-bot.Voiture.vitessemax),bot.Voiture.vitessemax);
+    bonus := bonus.next;
+  end;
+end;
+
+procedure LeaderVsleader(VoitA, liste : t_pJoueur);
+begin
+  if (liste <> NIL) then
+  begin
+    if
+    (Not(VoitA.Mort)) AND
+    (VoitA <> liste) AND
+    (VoitA.Categorie <> humain) AND
+    (VoitA.grade = 1) and
+    (liste.grade = 1) then
+    begin
+    ChampAttractif(VoitA,liste,2/40);
+    //Champrepulsif2(VoitA,liste);
+    end;
+  end;
+end;
+
+procedure ChampVM(j1 : T_pJoueur; map : PObjet; coeft : real);
+var i, pos : position;
+    d, coef, Vx, Vz, Vxx, Vyy, Ax, Az, pvect, pscal : real;
+    gauche, droite : real;
+begin
+
+      // droite := 0;
+       //gauche := 0;
+       map^.MeshQueue := @map^.MeshHead;
+       while map^.MeshQueue<>NIL do
+       begin
+         map^.MeshQueue^.FaceQueue := @map^.MeshQueue^.FaceHead;
+         while (map^.MeshQueue^.FaceQueue^.next<>NIL)  do
+         begin
+           pos := j1^.Voiture.emplacement;
+           pos.Translate(0.0,2.0,0.0);
+           i := interOPlanDroite(pos, map^.MeshQueue^.FaceQueue);
+           if (i.coordx<>0) or
+              (i.coordy<>0) or
+              (i.coordx<>0) then
+               if vraicolli(i, map^.MeshQueue^.FaceQueue) then
+               begin
+                 d := sqrt(sqr(j1^.Voiture.emplacement.coordx-i.coordx)+
+                           sqr(j1^.Voiture.emplacement.coordz-i.coordz));
+                 if (abs(map^.MeshQueue^.FaceQueue.U.y)<0.1) then
+                 begin
+                   //Vx := j1.Voiture.vitesse.norme*sin(j1.Voiture.vitesse.teta);
+                   //Vz := j1.Voiture.vitesse.norme*cos(j1.Voiture.vitesse.teta);
+
+                   //Coef := -10/(d*d);
+                   //Coef := -30/(d*d);
+                   Coef := Coeft/(d*d);
+
+                   Ax := Coef*(i.coordx-j1^.Voiture.emplacement.coordx);
+                   Az := Coef*(i.coordz-j1^.Voiture.emplacement.coordz);
+
+                   //pvect := (Vx*Az - Vz*Ax)/d;
+                  // pscal := (Vx*Ax + Vz*Az)/d;
+
+                  // Ax := CoefPeur*(Voitb.Voiture.emplacement.coordx - Voita.Voiture.emplacement.coordx);
+                  // Ay := CoefPeur*(Voitb.Voiture.emplacement.coordz - Voita.Voiture.emplacement.coordz);
+
+                   Vxx := j1.Voiture.Vex+ MYTIME * Ax;
+                   Vyy := j1.Voiture.Vey+ MYTIME * Az;
+
+                   j1.Voiture.Vex := Min(Max(Vxx,-j1.Voiture.vitessemax),j1.Voiture.vitessemax);
+                   j1.Voiture.Vey := Min(Max(Vyy,-j1.Voiture.vitessemax),j1.Voiture.vitessemax);
+
+
+                   //if pscal>0.9 then
+                    { if pvect>0 then Droite := Droite+90
+                     else Gauche:= Gauche+90; }
+                 end;
+               end;
+            map^.MeshQueue^.FaceQueue := map^.MeshQueue^.FaceQueue^.Next;
+         end;
+         map^.MeshQueue := map^.MeshQueue^.Next;
+       end;
+       //if (gauche<>0) or (droite<>0) then
+       //if gauche<droite then j1^.Voiture.Droite(j1^.essence)
+       //else j1^.Voiture.Gauche(j1^.essence);
+end;
+
+procedure PeurDrapeau(liste : T_pJoueur; Dx, Dz : integer);
+var dist, coef,ax,ay,vxx,vyy : real;
+begin
+    dist := sqrt(sqr(liste.Voiture.emplacement.coordx - Dx) + sqr(liste.Voiture.emplacement.coordz - Dz));
+       Coef := -80/(Dist*Dist);
+
+        Ax := (Coef*(Dx - liste.Voiture.emplacement.coordx));
+        Ay := (Coef*(Dz - liste.Voiture.emplacement.coordz));
+
+        Vxx := liste.Voiture.Vex + MYTIME*Ax;
+        Vyy := liste.Voiture.Vey + MYTIME*Ay;
+
+        liste.Voiture.Vex := Min(Max(Vxx,-liste.Voiture.vitessemax),liste.Voiture.vitessemax);
+        liste.Voiture.Vey := Min(Max(Vyy,-liste.Voiture.vitessemax),liste.Voiture.vitessemax);
+end;
+
+procedure TrouveDrapeau(liste : T_pJoueur; Dx,Dz : integer; PlusDrapeauBleu,PlusDrapeauRouge : integer);
+var dist, coef,ax,ay,vxx,vyy : real;
+begin
+    dist := sqrt(sqr(liste.Voiture.emplacement.coordx - Dx) + sqr(liste.Voiture.emplacement.coordz - Dz));
+
+    if (dist < 5) then
+    begin
+      liste.grade := (liste.grade+1) mod 2;
+      case liste.Equipe of
+        Bleu : PlusDrapeauRouge := (PlusDrapeauRouge+1) mod 2;
+        Rouge : PlusDrapeauBleu := (PlusDrapeauBleu+1) mod 2;
+      end;
+    end;
+    if (dist >= 5) then
+    begin
+        Coef := 80/(Dist*sqrt(Dist));
+       // Coef :=  2/40;
+       //Coef := 80/Dist;
+
+        Ax := (Coef*(Dx - liste.Voiture.emplacement.coordx));
+        Ay := (Coef*(Dz - liste.Voiture.emplacement.coordz));
+
+        Vxx := liste.Voiture.Vex + MYTIME*Ax;
+        Vyy := liste.Voiture.Vey + MYTIME*Ay;
+
+        liste.Voiture.Vex := Min(Max(Vxx,-liste.Voiture.vitessemax),liste.Voiture.vitessemax);
+        liste.Voiture.Vey := Min(Max(Vyy,-liste.Voiture.vitessemax),liste.Voiture.vitessemax);
+    end;
+end;
+
+procedure TrouveDrapeau2(liste : T_pJoueur; Dx, Dz : integer);
+var dist, coef,ax,ay,vxx,vyy : real;
+begin
+    //dist := sqrt(sqr(liste.Voiture.emplacement.coordx - Dx) + sqr(liste.Voiture.emplacement.coordz - Dz));
+
+    //if (dist < 5) then liste.grade := (liste.grade+1) mod 2;
+    //if (dist >= 5) then
+    begin
+       // Coef := 80/(Dist*sqrt(Dist));
+        Coef :=  2/40;
+       //Coef := 80/Dist;
+
+        Ax := (Coef*(Dx - liste.Voiture.emplacement.coordx));
+        Ay := (Coef*(Dz - liste.Voiture.emplacement.coordz));
+
+        Vxx := liste.Voiture.Vex + MYTIME*Ax;
+        Vyy := liste.Voiture.Vey + MYTIME*Ay;
+
+        liste.Voiture.Vex := Min(Max(Vxx,-liste.Voiture.vitessemax),liste.Voiture.vitessemax);
+        liste.Voiture.Vey := Min(Max(Vyy,-liste.Voiture.vitessemax),liste.Voiture.vitessemax);
+    end;
+end;
+
+{function collisionVoitDrapeau(liste : T_pJoueur) : boolean;
+var TEMP : boolean;
+begin
+  TEMP := FALSE;
+  case liste.Equipe of
+    Bleu : if (liste.Voiture.emplacement.coordx = -1087) AND
+                (liste.Voiture.emplacement.coordz = 440)
+           then TEMP := TRUE;
+    Rouge : if (liste.Voiture.emplacement.coordx = 1009) AND
+                (liste.Voiture.emplacement.coordz = -414)
+           then TEMP := TRUE;
+  end;
+  result := TEMP;
+end; }
+
+procedure Radar(liste : t_pJoueur; obj : PObjet; EspaceX,EspaceY,EchelleX,EchelleY : integer);
+begin
+  glPushMatrix;
+  OrthoMode(0,0,1027,768);
+
+  glEnable(GL_BLEND);
+  glEnable(GL_TEXTURE_2D);
+  glBindTexture(GL_TEXTURE_2D, TheGrille);
+
+  // cadre du radar
+  glColor3f(0.0,0.0,0.0);
+  glBegin(GL_QUADS);
+      glTexCoord2f(0, 0); glVertex2f(0+5,0+5);
+      glTexCoord2f(1, 0); glVertex2f(200,0+5);
+      glTexCoord2f(1, 1); glVertex2f(200,200);
+      glTexCoord2f(0, 1); glVertex2f(0+5,200);
+  glEnd;
+
+  glDisable(GL_BLEND);
+  glDisable(GL_TEXTURE_2D);
+  GlDisable(GL_DEPTH_TEST);
+
+  //Configuration des couleurs des spots-voitures du radar
+    while liste <> NIL do
+    begin
+
+      case liste.Equipe of
+          neutre : if liste.vie > 0 then glColor3f(0.0,1.0,1.0) else glColor3f(0.0,0.0,0.0);
+          Bleu  :
+             case liste.grade of
+                1  : begin
+                       glColor3f(0.0,1.0,1.0);
+                       //clignoteBleu := (clignoteBleu+1) mod 15;
+                       //if clignoteBleu = 0 then glColor3f(0.0,1.0,1.0) else glColor3f(0.0,0.0,1.0)
+                     end;
+                0  : glColor3f(0.0,0.0,1.0);
+               -1  : glColor3f(0.0,0.0,0.0);
+             end;
+          Rouge :
+             case liste.grade of
+                1  : begin
+                        glColor3f(1.0,1.0,1.0)
+                       //clignoteRouge := (clignoteRouge+1) mod 15;
+                       //if clignoteRouge = 0 then glColor3f(0.0,1.0,1.0) else glColor3f(1.0,0.0,0.0)
+                     end;
+                0  : glColor3f(1.0,0.0,0.0);
+               -1  : glColor3f(0.0,0.0,0.0);
+             end;
+
+      end;
+
+
+
+
+      {if liste.Equipe = Bleu then glColor3f(0.0,0,1.0)
+      else glColor3f(1.0,0.0,0.0);
+      if Liste.Categorie = humain then
+      begin
+        clignote := (clignote+1) mod 15;
+        if clignote = 0 then glColor3f(0.0,1.0,1.0) else glColor3f(0.0,0.0,1.0)
+      end;
+      if (Liste.Categorie <> humain) AND (Liste.grade = 1) then glColor3f(0.7,0.0,0.0);
+      if (Liste.vie <= 0) then glColor3f(0.2,0.2,0.2); }
+
+      glBegin(GL_QUADS);
+         glTexCoord2f(0, 0); glVertex2f(liste.Voiture.emplacement.coordx/EchelleX+EspaceX,liste.Voiture.emplacement.coordz/EchelleY+EspaceY);
+         glTexCoord2f(1, 0); glVertex2f(liste.Voiture.emplacement.coordx/EchelleX+EspaceX+4,liste.Voiture.emplacement.coordz/EchelleY+EspaceY);
+         glTexCoord2f(1, 1); glVertex2f(liste.Voiture.emplacement.coordx/EchelleX+EspaceX+4,liste.Voiture.emplacement.coordz/EchelleY+EspaceY+4);
+         glTexCoord2f(0, 1); glVertex2f(liste.Voiture.emplacement.coordx/EchelleX+EspaceX,liste.Voiture.emplacement.coordz/EchelleY+EspaceY+4);
+      glEnd;
+      liste := liste^.next;
+     end;
+
+
+   // scene vue de dessus dans le radar
+   Obj.MeshQueue := @Obj.MeshHead;
+   while Obj.MeshQueue<>NIL do
+   begin
+      Obj^.MeshQueue^.FaceQueue := @Obj^.MeshQueue^.FaceHead;
+      //glBindTexture(GL_TEXTURE_2D,TheGrille);
+      glBegin(GL_TRIANGLES);
+            while Obj^.MeshQueue^.FaceQueue^.Next<>NIL do
+            begin
+               glColor3f(0.6,0.7,0.7);
+               glTexCoord2f( Obj^.MeshQueue^.FaceQueue^.TextCoord[3].x,
+                             Obj^.MeshQueue^.FaceQueue^.TextCoord[3].z );
+               glVertex2f(Obj^.MeshQueue^.FaceQueue^.v[3].x/EchelleX+EspaceX,
+                          Obj^.MeshQueue^.FaceQueue^.v[3].z/EchelleY+EspaceY );
+               glTexCoord2f( Obj^.MeshQueue^.FaceQueue^.TextCoord[1].x,
+                             Obj^.MeshQueue^.FaceQueue^.TextCoord[1].z );
+               glVertex2f(Obj^.MeshQueue^.FaceQueue^.v[1].x/EchelleX+EspaceX,
+                          Obj^.MeshQueue^.FaceQueue^.v[1].z/EchelleY+EspaceY );
+               glTexCoord2f( Obj^.MeshQueue^.FaceQueue^.TextCoord[2].x,
+                             Obj^.MeshQueue^.FaceQueue^.TextCoord[2].z );
+               glVertex2f(Obj^.MeshQueue^.FaceQueue^.v[2].x/EchelleX+EspaceX,
+                          Obj^.MeshQueue^.FaceQueue^.v[2].z/EchelleY+EspaceY );
+               Obj^.MeshQueue^.FaceQueue := Obj^.MeshQueue^.FaceQueue^.Next;
+            end;
+      glEnd();
+      Obj^.MeshQueue := Obj^.MeshQueue^.Next;
+   end;
+
+   glEnable(GL_DEPTH_TEST);
+
+ PerspectiveMode;
+ glPopMatrix;
+end;  //radar
+
+
+procedure TrouveUnMort(voitA, liste : T_pJoueur);
+begin
+  if liste <> NIL then
+  begin
+    if liste.vie <= 0 then ChampRepulsif(voitA,liste,100);
+  end;
+end;
+
+function PlusPresVoit(voitA, ll : T_pJoueur) : T_pJoueur;
+var Old,dist : real; voit,liste : T_pJoueur;
+begin
+  old := -1;
+  Voit := NIL;
+  liste := ll;
+  while (liste <> NIL) do
+  //if (liste <> NIL) then
+  begin
+      if (liste.vie >0) AND (VoitA.vie >0) AND (voitA.Categorie <> humain) AND
+         (liste.Equipe <> voitA.Equipe) AND (DistanceVoiture(voitA,liste)<20) then
+      begin
+          //old.val := Max(old,Distance(voitA, liste));
+          dist := DistanceVoiture(voitA, liste);
+          if old < Dist then
+          begin
+            old := Dist;
+            voit := liste;
+          end;
+      end;
+      liste := liste.next;
+  end;
+  result := voit;
+end;
+
+procedure AutreJoueur(pjoueur,liste : T_pJoueur);
+var Trouve : boolean; TEMP : T_pJoueur; old : integer;
+begin
+  Trouve := FALSE;
+
+  while (liste <> NIL) do
+  begin
+    if (not(Trouve)) AND (pjoueur.Categorie = humain) AND (liste.Equipe = Bleu)
+       AND (liste.vie >0) AND (liste<>pjoueur) then
+    begin
+      {TEMP := pjoueur;
+      pjoueur := liste;
+      liste := TEMP; }
+    pjoueur.Categorie := artificielle;
+   // pjoueur.Equipe := BLEU;
+   // liste.Equipe := BLEU;
+    old := pjoueur.grade;
+    pjoueur.grade := liste.grade;
+    liste.grade := old;
+    liste.Categorie := humain;
+    liste.Voiture.orientation.Init(0.0,0.0,0.0);
+    liste.Voiture.vitesse.Init (0.0,0.0,0.0);
+
+
+      Trouve := TRUE;
+    end else
+    liste := liste.next;
+  end;
+end;
+
+end.
+
+
+
